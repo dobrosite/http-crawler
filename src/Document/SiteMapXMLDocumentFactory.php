@@ -32,7 +32,8 @@ class SiteMapXMLDocumentFactory implements Factory
      */
     public function create(HTTPSource $source, $uri, ResponseInterface $response)
     {
-        if (strpos($response->getHeaderLine('content-type'), 'application/xml') === false) {
+        $contentType = $response->getHeaderLine('content-type');
+        if (preg_match('#^(application|text)/xml#', $contentType) === false) {
             return null;
         }
 
