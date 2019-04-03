@@ -9,8 +9,8 @@
 namespace DobroSite\Crawler\HTTP\Tests\Unit\Document;
 
 use DobroSite\Crawler\Source\Source;
+use PHPUnit\Framework\TestCase;
 use PHPUnit_Framework_MockObject_MockObject as MockObject;
-use PHPUnit_Framework_TestCase as TestCase;
 
 /**
  * Основной класс для тестов документов.
@@ -23,10 +23,12 @@ abstract class AbstractDocumentTest extends TestCase
      * @param string $rootUri
      *
      * @return Source|MockObject
+     *
+     * @throws \Exception
      */
     protected function createSource($rootUri)
     {
-        $source = $this->getMockForAbstractClass(Source::class);
+        $source = $this->createMock(Source::class);
 
         $source->method('rootUri')->willReturn($rootUri);
 

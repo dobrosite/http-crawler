@@ -9,14 +9,18 @@
 namespace DobroSite\Crawler\HTTP\Source;
 
 use DobroSite\Crawler\Document\Document;
+use DobroSite\Crawler\Exception\Source\ReadException;
 use DobroSite\Crawler\HTTP\Document\Factory;
 use DobroSite\Crawler\HTTP\Document\HTMLDocumentFactory;
 use DobroSite\Crawler\HTTP\Document\SiteMapXMLDocumentFactory;
 use DobroSite\Crawler\HTTP\Event\Source\ResponseEvent;
 use DobroSite\Crawler\HTTP\SourceEvents;
 use DobroSite\Crawler\Source\Source;
+use GuzzleHttp\Psr7\Uri;
+use Http\Client\Exception as HttpClientException;
 use Http\Client\HttpClient;
 use Http\Message\RequestFactory;
+use Psr\Http\Message\ResponseInterface;
 use Symfony\Component\EventDispatcher\EventDispatcher;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
@@ -129,12 +133,15 @@ class HTTPSource implements Source
      *
      * @return Document
      *
+     * @throws \RuntimeException Если нет подходящей фабрики.
+     * @throws ReadException Если не удалось прочитать данные.
+     *
+     * @since 0.2 вбрасывает исключение ReadException если не удалось прочитать данные.
      * @since 0.1
      */
     public function getDocument($uri)
     {
-        $request = $this->requestFactory->createRequest('GET', $uri);
-        $response = $this->httpClient->sendRequest($request);
+        $response = $this->sendHttpRequest($uri);
 
         $event = new ResponseEvent($this, $response);
         $this->eventDispatcher->dispatch(SourceEvents::RESPONSE, $event);
@@ -160,5 +167,52 @@ class HTTPSource implements Source
     public function rootUri()
     {
         return $this->rootUri;
+    }
+
+    /**
+     * Выполняет запрос по HTTP указанного URI.
+     *
+     * @param string $uri
+     *
+     * @return ResponseInterface
+     *
+     * @throws ReadException Если не удалось прочитать данные.
+     */
+    private function sendHttpRequest($uri)
+    {
+        $request = $this->requestFactory->createRequest('GET', $uri);
+        try {
+            $response = $this->httpClient->sendRequest($request);
+        } catch (HttpClientException $exception) {
+            throw new ReadException(
+                sprintf('Can not read document "%s". %s', $uri, $exception->getMessage()),
+                $this,
+                0,
+                $exception
+            );
+        } catch (\Exception $exception) {
+            throw new ReadException(
+                sprintf('Can not read document "%s". %s', $uri, $exception->getMessage()),
+                $this,
+                0,
+                $exception
+            );
+        }
+
+        if ((int) floor($response->getStatusCode() / 100) === 3) {
+            $oldUri = new Uri($uri);
+            $newUri = new Uri($response->getHeaderLine('Location'));
+            if ($newUri->getHost() === '') {
+                $newUri = $newUri->withHost($oldUri->getHost());
+            }
+            if ($newUri->getScheme() === '') {
+                $newUri = $newUri->withScheme($oldUri->getScheme());
+            }
+            $response = $this->sendHttpRequest($newUri);
+        }
+
+        // TODO Обработка ошибок (4xx, 5xx).
+
+        return $response;
     }
 }

@@ -10,8 +10,8 @@ namespace DobroSite\Crawler\HTTP\Tests\Unit\Document;
 
 use DobroSite\Crawler\HTTP\Document\SiteMapXMLDocumentFactory;
 use DobroSite\Crawler\HTTP\Source\HTTPSource;
+use PHPUnit\Framework\TestCase;
 use PHPUnit_Framework_MockObject_MockObject as MockObject;
-use PHPUnit_Framework_TestCase as TestCase;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\StreamInterface;
 
@@ -22,6 +22,11 @@ use Psr\Http\Message\StreamInterface;
  */
 class SiteMapXMLDocumentFactoryTest extends TestCase
 {
+    /**
+     * Поставщик карт в разных форматах.
+     *
+     * @return array
+     */
     public function differentFormatsProvider()
     {
         return [
