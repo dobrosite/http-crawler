@@ -11,8 +11,6 @@ namespace DobroSite\Crawler\HTTP\Source;
 use DobroSite\Crawler\Document\Document;
 use DobroSite\Crawler\Exception\Source\ReadException;
 use DobroSite\Crawler\HTTP\Document\Factory;
-use DobroSite\Crawler\HTTP\Document\HTMLDocumentFactory;
-use DobroSite\Crawler\HTTP\Document\SiteMapXMLDocumentFactory;
 use DobroSite\Crawler\HTTP\Event\Source\ResponseEvent;
 use DobroSite\Crawler\HTTP\SourceEvents;
 use DobroSite\Crawler\Source\Source;
@@ -21,7 +19,7 @@ use Http\Client\Exception as HttpClientException;
 use Http\Client\HttpClient;
 use Http\Message\RequestFactory;
 use Psr\Http\Message\ResponseInterface;
-use Symfony\Component\EventDispatcher\EventDispatcher;
+use Symfony\Component\EventDispatcher\Event;
 use Symfony\Component\EventDispatcher\EventDispatcherInterface;
 
 /**
@@ -34,7 +32,7 @@ class HTTPSource implements Source
     /**
      * Диспетчер событий.
      *
-     * @var EventDispatcherInterface
+     * @var EventDispatcherInterface|null
      */
     private $eventDispatcher;
 
@@ -69,61 +67,27 @@ class HTTPSource implements Source
     /**
      * Создаёт клиента.
      *
-     * @param string                        $rootUri         Корневой URI.
-     * @param HttpClient                    $client          Клиент HTTP.
-     * @param RequestFactory                $requestFactory  Фабрика запросов.
-     * @param EventDispatcherInterface|null $eventDispatcher Диспетчер событий.
+     * @param string                        $rootUri           Корневой URI.
+     * @param HttpClient                    $client            Клиент HTTP.
+     * @param RequestFactory                $requestFactory    Фабрика запросов.
+     * @param Factory[]                     $documentFactories Фабрики документов.
+     * @param EventDispatcherInterface|null $eventDispatcher   Диспетчер событий.
      *
+     * @since 0.3 Добавлен аргумент $documentFactories.
      * @since 0.1
      */
     public function __construct(
         $rootUri,
         HttpClient $client,
         RequestFactory $requestFactory,
+        array $documentFactories,
         EventDispatcherInterface $eventDispatcher = null
     ) {
         $this->rootUri = $rootUri;
         $this->httpClient = $client;
         $this->requestFactory = $requestFactory;
-        $this->eventDispatcher = $eventDispatcher ?: new EventDispatcher();
-
-        $this
-            ->addDocumentFactory(new SiteMapXMLDocumentFactory())
-            ->addDocumentFactory(new HTMLDocumentFactory());
-    }
-
-    /**
-     * Добавляет фабрику документов.
-     *
-     * @param Factory $factory
-     *
-     * @return $this
-     *
-     * @since 0.1
-     */
-    public function addDocumentFactory(Factory $factory)
-    {
-        $this->factories[] = $factory;
-
-        return $this;
-    }
-
-    /**
-     * Добавляет слушателя событий.
-     *
-     * @param string   $eventName Имя события.
-     * @param callable $listener  Слушатель.
-     * @param int      $priority  Приоритет (больше значение — раньше будет вызван слушатель).
-     *
-     * @return $this
-     *
-     * @since 0.1
-     */
-    public function addEventListener($eventName, $listener, $priority = 0)
-    {
-        $this->eventDispatcher->addListener($eventName, $listener, $priority);
-
-        return $this;
+        $this->factories = $documentFactories;
+        $this->eventDispatcher = $eventDispatcher;
     }
 
     /**
@@ -144,7 +108,7 @@ class HTTPSource implements Source
         $response = $this->sendHttpRequest($uri);
 
         $event = new ResponseEvent($this, $response);
-        $this->eventDispatcher->dispatch(SourceEvents::RESPONSE, $event);
+        $this->dispatchEvent(SourceEvents::RESPONSE, $event);
         $response = $event->getResponse();
 
         foreach ($this->factories as $factory) {
@@ -167,6 +131,21 @@ class HTTPSource implements Source
     public function rootUri()
     {
         return $this->rootUri;
+    }
+
+    /**
+     * Отправляет извещение о событии.
+     *
+     * @param string $eventName
+     * @param Event  $event
+     *
+     * @return void
+     */
+    private function dispatchEvent($eventName, Event $event)
+    {
+        if ($this->eventDispatcher !== null) {
+            $this->eventDispatcher->dispatch($eventName, $event);
+        }
     }
 
     /**

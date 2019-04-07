@@ -8,6 +8,8 @@
 
 namespace DobroSite\Crawler\HTTP\Tests\Unit\Source;
 
+use DobroSite\Crawler\Document\Document;
+use DobroSite\Crawler\HTTP\Document\Factory;
 use DobroSite\Crawler\HTTP\Source\HTTPSource;
 use Http\Client\HttpClient;
 use Http\Message\RequestFactory;
@@ -29,6 +31,13 @@ class HTTPSourceTest extends TestCase
      * Корневой адрес источника.
      */
     const ROOT_URI = 'http://example.com/';
+
+    /**
+     * Фабрика документов.
+     *
+     * @var Factory
+     */
+    private $documentFactory;
 
     /**
      * Диспетчер событий.
@@ -113,6 +122,12 @@ class HTTPSourceTest extends TestCase
             ->with(self::identicalTo($request2))
             ->willReturn($response2);
 
+        $this->documentFactory
+            ->expects(self::once())
+            ->method('create')
+            ->with(self::identicalTo($this->source))
+            ->willReturn($this->createMock(Document::class));
+
         $this->source->getDocument(self::ROOT_URI . 'foo');
     }
 
@@ -130,6 +145,12 @@ class HTTPSourceTest extends TestCase
         $this->eventDispatcher = $this->createMock(EventDispatcherInterface::class);
         $this->httpClient = $this->createMock(HttpClient::class);
         $this->requestFactory = $this->createMock(RequestFactory::class);
-        $this->source = new HTTPSource(self::ROOT_URI, $this->httpClient, $this->requestFactory);
+        $this->documentFactory = $this->createMock(Factory::class);
+        $this->source = new HTTPSource(
+            self::ROOT_URI,
+            $this->httpClient,
+            $this->requestFactory,
+            [$this->documentFactory]
+        );
     }
 }
